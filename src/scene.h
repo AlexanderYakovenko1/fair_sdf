@@ -30,14 +30,14 @@ public:
 
 //                std::multimap<double, std::shared_ptr<SDF>> hits;  // hits sorted by distance
                 std::shared_ptr<SDF> hit;
-                for (auto object : objects_) {
+                for (const auto& object : objects_) {
                     if (object->distance(x, y) < eps) {
                         hit = object;
                     }
                 }
                 RGBColor color = background_;
                 if (hit) {
-                    color = hit->getColor();
+                    color = hit->getColor(x, y);
                 }
                 image(i, j, 0) = color.r;
                 image(i, j, 1) = color.g;
