@@ -25,8 +25,8 @@ public:
     void RenderToImage(Image<pixel_type>& image, double eps=1e-3) {
         for (int i = 0; i < image.height_; ++i) {
             for (int j = 0; j < image.width_; ++j) {
-                double y = y_min_ + double(j) / image.width_ * (y_max_ - y_min_);
-                double x = x_min_ + double(i) / image.height_ * (x_max_ - x_min_);
+                double y = y_min_ + double(i) / image.width_ * (y_max_ - y_min_);
+                double x = x_min_ + double(j) / image.height_ * (x_max_ - x_min_);
 
 //                std::multimap<double, std::shared_ptr<SDF>> hits;  // hits sorted by distance
                 std::shared_ptr<SDF> hit;

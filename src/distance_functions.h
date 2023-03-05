@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <algorithm>
 
 struct RGBColor {
     uint8_t r, g, b;
@@ -28,6 +29,151 @@ public:
     double distance(double x, double y) override {
         return std::sqrt((x - x_) * (x - x_) + (y - y_) * (y - y_)) - radius_;
     }
+    RGBColor getColor(double x, double y) override {
+        return color_;
+    }
+};
+
+class AxisAlignedRectangle: public SDF {
+    double x_, y_;
+    double width_, height_;
+    RGBColor color_;
+public:
+    AxisAlignedRectangle(double x, double y, double width, double height, RGBColor color):
+        x_(x),
+        y_(y),
+        width_(width),
+        height_(height),
+        color_(color)
+    {}
+
+    double distance(double x, double y) override {
+        double dx = std::abs(x - x_) - width_;
+        double dy = std::abs(y - y_) - height_;
+
+        return std::sqrt(std::max(dx, 0.0) * std::max(dx, 0.0) + std::max(dy, 0.0) * std::max(dy, 0.0)) + std::min(std::max(dx, dy), 0.0);
+    }
+
+    RGBColor getColor(double x, double y) override {
+        return color_;
+    }
+};
+
+class Segment: public SDF {
+    double a_x_, a_y_, b_x_, b_y_;
+    RGBColor color_;
+public:
+    Segment(double a_x, double a_y, double b_x, double b_y, RGBColor color):
+        a_x_(a_x),
+        a_y_(a_y),
+        b_x_(b_x),
+        b_y_(b_y),
+        color_(color)
+    {}
+
+    double distance(double x, double y) override {
+        double dx = x - a_x_;
+        double dy = y - a_y_;
+        double bax = b_x_ - a_x_;
+        double bay = b_y_ - a_y_;
+
+        double h = std::clamp((dx * bax + dy * bay) / (bax * bax + bay * bay), 0.0, 1.0);
+        return std::sqrt((dx - bax * h) * (dx - bax * h) + (dy - bay * h) * (dy - bay * h));
+    }
+
+    RGBColor getColor(double x, double y) override {
+        return color_;
+    }
+
+};
+
+class AxisAlignedEquilateralTriangle: public SDF {
+    double x_, y_;
+    double length_;
+    RGBColor color_;
+public:
+    AxisAlignedEquilateralTriangle(double x, double y, double length, RGBColor color):
+        x_(x),
+        y_(y),
+        length_(length),
+        color_(color)
+    {}
+
+    double distance(double x, double y) override {
+        double k = std::sqrt(3.0);
+
+        double dx = std::abs(x - x_) - length_;
+        double dy = y_ - y + length_ / k;
+
+        if (dx + k * dy > 0.0) {
+            double tmp = dx;
+            dx = (dx - k * dy) / 2.0;
+            dy = (-k * tmp - dy) / 2.0;
+        }
+        dx -= std::clamp(dx, -2.0 * length_, 0.0);
+
+        return (dy > 0.0 ? -1.0 : 1.0) * std::sqrt(dx * dx + dy * dy);
+    }
+
+    RGBColor getColor(double x, double y) override {
+        return color_;
+    }
+};
+
+class SDFImage: public SDF {
+    double x_, y_;
+    double scale_;
+    RGBColor color_;
+
+    int width_, height_;
+    int max_side_;
+    uint8_t* data_;
+
+    uint8_t getPixel(size_t i, size_t j) {
+        if (i < height_ && j < width_) {
+            return data_[i * width_ + j];
+        } else {
+            return 0;
+        }
+    }
+public:
+    SDFImage(const std::string& filepath, double x, double y, double scale, RGBColor color): x_(x), y_(y), scale_(scale),
+                                                                                             color_(color) {
+        int channels;
+        data_ = stbi_load(filepath.c_str(), &width_, &height_, &channels, 1);
+        max_side_ = std::max(width_, height_);
+        if (data_ == nullptr) {
+            std::cerr << "Image failed to load" << std::endl;
+            exit(1);
+        }
+    }
+
+    double distance(double x, double y) override {
+        double ix = x - x_;
+        double iy = y - y_;
+        if (ix < 0 || iy < 0 || ix >= scale_ * width_ / max_side_ || iy >= scale_ * height_ / max_side_) {
+            return 1.0;
+        } else {
+            // bilinear interpolation
+            ix *= max_side_ / scale_;
+            iy *= max_side_ / scale_;
+            double interp_x = std::modf(ix, &ix);
+            double interp_y = std::modf(iy, &iy);
+
+            double pixels[4] = {
+                    static_cast<double>(getPixel(static_cast<size_t>(iy    ), static_cast<size_t>(ix    ))),
+                    static_cast<double>(getPixel(static_cast<size_t>(iy    ), static_cast<size_t>(ix + 1))),
+                    static_cast<double>(getPixel(static_cast<size_t>(iy + 1), static_cast<size_t>(ix    ))),
+                    static_cast<double>(getPixel(static_cast<size_t>(iy + 1), static_cast<size_t>(ix + 1)))
+            };
+            double value = pixels[0] * (1 - interp_y) * (1 - interp_x) +
+                           pixels[1] * (1 - interp_y) * (    interp_x) +
+                           pixels[2] * (    interp_y) * (1 - interp_x) +
+                           pixels[3] * (    interp_y) * (    interp_x);
+            return (128. - value) / 255.;
+        }
+    }
+
     RGBColor getColor(double x, double y) override {
         return color_;
     }
