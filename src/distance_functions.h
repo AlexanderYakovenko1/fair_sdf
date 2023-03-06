@@ -207,6 +207,8 @@ public:
             std::cerr << "Image failed to load" << std::endl;
             exit(1);
         }
+        x_ = x_ - scale_ * width_ / max_side_ / 2;
+        y_ = y_ - scale_ * height_ / max_side_ / 2;
     }
 
     double distance(double x, double y) override {
@@ -319,7 +321,7 @@ public:
         RGBColor bottom_color = bottom_->getColor(x, y);
 
         // TODO: move to get color definition
-        double eps = 1e-3;
+        double eps = 2e-3;
         if (top_dist < eps && bottom_dist < eps) {
             return MixColors(top_color, bottom_color, alpha_);
         } else if (bottom_dist < eps) {
