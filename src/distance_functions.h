@@ -156,7 +156,7 @@ public:
     AxisAlignedEquilateralTriangle(double x, double y, double radius, Color color):
         x_(x),
         y_(y),
-        radius_(radius),
+        radius_(radius * 2 / std::sqrt(3)),
         color_(color)
     {}
 
@@ -164,7 +164,7 @@ public:
         double k = std::sqrt(3.0);
 
         double dx = std::abs(x - x_) - radius_;
-        double dy = y_ - y + radius_ / k;
+        double dy = y_ - y + radius_ / k + radius_ / std::sqrt(3) / 2;
 
         if (dx + k * dy > 0.0) {
             double tmp = dx;
