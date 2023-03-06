@@ -28,11 +28,11 @@ public:
                 double y = y_min_ + double(i) / image.width_ * (y_max_ - y_min_);
                 double x = x_min_ + double(j) / image.height_ * (x_max_ - x_min_);
 
-//                std::multimap<double, std::shared_ptr<SDF>> hits;  // hits sorted by distance
                 std::shared_ptr<SDF> hit;
                 for (const auto& object : objects_) {
                     if (object->distance(x, y) < eps) {
                         hit = object;
+                        break;
                     }
                 }
                 RGBColor color = background_;

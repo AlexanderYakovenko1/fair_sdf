@@ -238,7 +238,7 @@ public:
     }
 
     RGBColor getColor(double x, double y) override {
-        return color_.getColor(distance(x, y), x - x_ - scale_);
+        return color_.getColor(distance(x, y), y - y_ - scale_);
     }
 };
 
