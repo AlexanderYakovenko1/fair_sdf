@@ -11,6 +11,68 @@ struct RGBColor {
     uint8_t r, g, b;
 };
 
+RGBColor MixColors(RGBColor first, RGBColor second, double alpha) {
+    return {
+            uint8_t(sqrt(double(first.r) * double(first.r) * alpha + double(second.r) * double(second.r) * (1 - alpha))),
+            uint8_t(sqrt(double(first.g) * double(first.g) * alpha + double(second.g) * double(second.g) * (1 - alpha))),
+            uint8_t(sqrt(double(first.b) * double(first.b) * alpha + double(second.b) * double(second.b) * (1 - alpha)))
+    };
+}
+
+class Color {
+    RGBColor base_;
+    RGBColor gradient_to_;
+    RGBColor border_;
+    double frequency_;
+    double thickness_;
+
+    bool has_gradient_;
+    bool has_border_;
+public:
+    Color(RGBColor base):
+        base_(base),
+        has_gradient_(false),
+        has_border_(false)
+    {}
+
+    Color(RGBColor base, RGBColor gradient_to, double frequency=1.0):
+        base_(base),
+        gradient_to_(gradient_to),
+        frequency_(frequency),
+        has_gradient_(true),
+        has_border_(false)
+    {}
+
+    // likely not the best way to overload, but it works :)
+    Color(RGBColor base, double thickness, RGBColor border):
+            base_(base),
+            border_(border),
+            thickness_(thickness),
+            has_gradient_(false),
+            has_border_(true)
+    {}
+
+    Color(RGBColor base, RGBColor gradient_to, RGBColor border, double frequency=1.0, double thickness=0.1):
+        base_(base),
+        gradient_to_(gradient_to),
+        border_(border),
+        frequency_(frequency),
+        thickness_(thickness),
+        has_gradient_(true),
+        has_border_(true)
+    {}
+
+    RGBColor getColor(double distance=0.0, double arg=0.0) {
+        if (has_border_ && std::abs(distance) < thickness_) {
+            return border_;
+        } else if (has_gradient_) {
+            return MixColors(base_, gradient_to_, std::pow(std::sin(arg * frequency_), 2.0));
+        } else {
+            return base_;
+        }
+    }
+};
+
 class SDF {
 public:
     SDF() = default;
@@ -19,36 +81,26 @@ public:
     virtual RGBColor getColor(double x, double y) = 0;
 };
 
-
-RGBColor MixColors(RGBColor first, RGBColor second, double alpha) {
-    return {
-        uint8_t(sqrt(double(first.r) * double(first.r) * alpha + double(second.r) * double(second.r) * (1 - alpha))),
-        uint8_t(sqrt(double(first.g) * double(first.g) * alpha + double(second.g) * double(second.g) * (1 - alpha))),
-        uint8_t(sqrt(double(first.b) * double(first.b) * alpha + double(second.b) * double(second.b) * (1 - alpha)))
-    };
-}
-
-
 class Circle: public SDF {
     double x_, y_;
     double radius_;
-    RGBColor color_;
+    Color color_;
 public:
-    Circle(double x, double y, double radius, RGBColor color): x_(x), y_(y), radius_(radius), color_(color) {}
+    Circle(double x, double y, double radius, Color color): x_(x), y_(y), radius_(radius), color_(color) {}
     double distance(double x, double y) override {
         return std::sqrt((x - x_) * (x - x_) + (y - y_) * (y - y_)) - radius_;
     }
     RGBColor getColor(double x, double y) override {
-        return color_;
+        return color_.getColor(distance(x, y), x - x_ - radius_);
     }
 };
 
 class AxisAlignedRectangle: public SDF {
     double x_, y_;
     double width_, height_;
-    RGBColor color_;
+    Color color_;
 public:
-    AxisAlignedRectangle(double x, double y, double width, double height, RGBColor color):
+    AxisAlignedRectangle(double x, double y, double width, double height, Color color):
         x_(x),
         y_(y),
         width_(width),
@@ -64,7 +116,7 @@ public:
     }
 
     RGBColor getColor(double x, double y) override {
-        return color_;
+        return color_.getColor(distance(x, y), y - y_ - height_);
     }
 };
 
@@ -98,44 +150,41 @@ public:
 
 class AxisAlignedEquilateralTriangle: public SDF {
     double x_, y_;
-    double length_;
-    RGBColor color_;
+    double radius_;
+    Color color_;
 public:
-    AxisAlignedEquilateralTriangle(double x, double y, double length, RGBColor color):
+    AxisAlignedEquilateralTriangle(double x, double y, double radius, Color color):
         x_(x),
         y_(y),
-        length_(length),
+        radius_(radius),
         color_(color)
     {}
 
     double distance(double x, double y) override {
         double k = std::sqrt(3.0);
 
-        double dx = std::abs(x - x_) - length_;
-        double dy = y_ - y + length_ / k;
+        double dx = std::abs(x - x_) - radius_;
+        double dy = y_ - y + radius_ / k;
 
         if (dx + k * dy > 0.0) {
             double tmp = dx;
             dx = (dx - k * dy) / 2.0;
             dy = (-k * tmp - dy) / 2.0;
         }
-        dx -= std::clamp(dx, -2.0 * length_, 0.0);
+        dx -= std::clamp(dx, -2.0 * radius_, 0.0);
 
         return (dy > 0.0 ? -1.0 : 1.0) * std::sqrt(dx * dx + dy * dy);
     }
 
     RGBColor getColor(double x, double y) override {
-        if (distance(x, y) > -0.05) {
-            return {0,0,0};
-        }
-        return color_;
+        return color_.getColor(distance(x, y), y - y_ - radius_);
     }
 };
 
 class SDFImage: public SDF {
     double x_, y_;
     double scale_;
-    RGBColor color_;
+    Color color_;
 
     int width_, height_;
     int max_side_;
@@ -149,8 +198,8 @@ class SDFImage: public SDF {
         }
     }
 public:
-    SDFImage(const std::string& filepath, double x, double y, double scale, RGBColor color): x_(x), y_(y), scale_(scale),
-                                                                                             color_(color) {
+    SDFImage(const std::string& filepath, double x, double y, double scale, Color color): x_(x), y_(y), scale_(scale),
+                                                                                          color_(color) {
         int channels;
         data_ = stbi_load(filepath.c_str(), &width_, &height_, &channels, 1);
         max_side_ = std::max(width_, height_);
@@ -187,7 +236,7 @@ public:
     }
 
     RGBColor getColor(double x, double y) override {
-        return color_;
+        return color_.getColor(distance(x, y), x - x_ - scale_);
     }
 };
 
