@@ -116,6 +116,9 @@ public:
     }
 
     RGBColor getColor(double x, double y) override {
+        if (distance(x, y) > -0.05) {
+            return {0,0,0};
+        }
         return color_;
     }
 };
@@ -208,6 +211,7 @@ public:
          smooth_(smooth),
          smoothness_(smoothness)
     {}
+
     double distance(double x, double y) override {
         if (smooth_) {
             return sminCubic(first_->distance(x, y), second_->distance(x, y), smoothness_);
@@ -215,6 +219,7 @@ public:
             return std::min(first_->distance(x, y), second_->distance(x, y));
         }
     }
+
     RGBColor getColor(double x, double y) override {
         double first_dist = first_->distance(x, y);
         double second_dist = second_->distance(x, y);
@@ -233,6 +238,44 @@ public:
             } else {
                 return second_->getColor(x, y);
             }
+        }
+    }
+};
+
+class Overlay: public SDF {
+    std::shared_ptr<SDF> top_;
+    std::shared_ptr<SDF> bottom_;
+    double alpha_;
+public:
+    Overlay(std::shared_ptr<SDF>&& top, std::shared_ptr<SDF>&& bottom, double alpha=0.5):
+        top_(std::move(top)),
+        bottom_(std::move(bottom)),
+        alpha_(alpha)
+    {}
+
+    double distance(double x, double y) override {
+        return std::min(top_->distance(x, y), bottom_->distance(x, y));
+    }
+
+    RGBColor getColor(double x, double y) override {
+        double top_dist = top_->distance(x, y);
+        double bottom_dist = bottom_->distance(x, y);
+
+        RGBColor top_color = top_->getColor(x, y);
+        RGBColor bottom_color = bottom_->getColor(x, y);
+
+        // TODO: move to get color definition
+        double eps = 1e-3;
+        if (top_dist < eps && bottom_dist < eps) {
+            return {
+                    uint8_t(sqrt(double(top_color.r) * double(top_color.r) * alpha_ + double(bottom_color.r) * double(bottom_color.r) * (1 - alpha_))),
+                    uint8_t(sqrt(double(top_color.g) * double(top_color.g) * alpha_ + double(bottom_color.g) * double(bottom_color.g) * (1 - alpha_))),
+                    uint8_t(sqrt(double(top_color.b) * double(top_color.b) * alpha_ + double(bottom_color.b) * double(bottom_color.b) * (1 - alpha_)))
+            };
+        } else if (bottom_dist < eps) {
+            return bottom_color;
+        } else {
+            return top_color;
         }
     }
 };
