@@ -20,6 +20,15 @@ public:
 };
 
 
+RGBColor MixColors(RGBColor first, RGBColor second, double alpha) {
+    return {
+        uint8_t(sqrt(double(first.r) * double(first.r) * alpha + double(second.r) * double(second.r) * (1 - alpha))),
+        uint8_t(sqrt(double(first.g) * double(first.g) * alpha + double(second.g) * double(second.g) * (1 - alpha))),
+        uint8_t(sqrt(double(first.b) * double(first.b) * alpha + double(second.b) * double(second.b) * (1 - alpha)))
+    };
+}
+
+
 class Circle: public SDF {
     double x_, y_;
     double radius_;
@@ -227,11 +236,7 @@ public:
             double blend = sminCubicCol(second_dist, first_dist, smoothness_);
             auto fcol = first_->getColor(x, y);
             auto scol = second_->getColor(x, y);
-            return {
-                    uint8_t(sqrt(double(fcol.r) * double(fcol.r) * blend + double(scol.r) * double(scol.r) * (1 - blend))),
-                    uint8_t(sqrt(double(fcol.g) * double(fcol.g) * blend + double(scol.g) * double(scol.g) * (1 - blend))),
-                    uint8_t(sqrt(double(fcol.b) * double(fcol.b) * blend + double(scol.b) * double(scol.b) * (1 - blend)))
-            };
+            return MixColors(fcol, scol, blend);
         } else {
             if (first_dist < second_dist) {
                 return first_->getColor(x, y);
@@ -267,11 +272,7 @@ public:
         // TODO: move to get color definition
         double eps = 1e-3;
         if (top_dist < eps && bottom_dist < eps) {
-            return {
-                    uint8_t(sqrt(double(top_color.r) * double(top_color.r) * alpha_ + double(bottom_color.r) * double(bottom_color.r) * (1 - alpha_))),
-                    uint8_t(sqrt(double(top_color.g) * double(top_color.g) * alpha_ + double(bottom_color.g) * double(bottom_color.g) * (1 - alpha_))),
-                    uint8_t(sqrt(double(top_color.b) * double(top_color.b) * alpha_ + double(bottom_color.b) * double(bottom_color.b) * (1 - alpha_)))
-            };
+            return MixColors(top_color, bottom_color, alpha_);
         } else if (bottom_dist < eps) {
             return bottom_color;
         } else {
